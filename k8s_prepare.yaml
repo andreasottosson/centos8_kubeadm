@@ -1,0 +1,131 @@
+---
+- hosts: k8s-master1 
+  become: true
+  remote_user: root
+  
+  vars:
+    crictl_ver: v1.17.0
+    cni_plugins_ver: v0.8.1
+
+  tasks:
+  - name: Install build deps
+    dnf:
+      name:
+        - pkgconf-pkg-config
+        - containers-common
+        - device-mapper-devel
+        - git
+        - glib2-devel
+        - glibc-devel
+        - glibc-static
+        - go
+        - gpgme-devel
+        - libassuan-devel
+        - libgpg-error-devel
+        - libseccomp-devel
+        - libselinux-devel
+        - make
+        - runc
+      state: present
+
+  - name: Clone CRI-O repo
+    git:
+      repo: https://github.com/cri-o/cri-o.git
+      dest: /tmp/cri-o
+
+  - name: Make CRIO-O
+    make:
+      chdir: /tmp/cri-o
+
+  - name: Make install CRI-O
+    make:
+      chdir: /tmp/cri-o
+      target: install
+
+  - name: Clone conmon repo
+    git:
+      repo: https://github.com/containers/conmon
+      dest: /tmp/conmon
+
+  - name: Make conmon
+    make:
+      chdir: /tmp/conmon
+
+  - name: Make install conmon
+    make:
+      chdir: /tmp/conmon
+      target: install
+
+  - name: Clone CNI-plugins
+    git:
+      repo: https://github.com/containernetworking/plugins
+      dest: /tmp/cni-plugins
+      version: "{{ cni_plugins_ver }}"
+
+  - name: Build CNI-plugins
+    shell: |
+      cd /tmp/cni-plugins && ./build_linux.sh
+
+  - name: Copy CNI-plugins
+    copy:
+      remote_src: yes
+      src: /tmp/cni-plugins/bin/
+      dest: /opt/cni/bin/
+
+  - name: Find .conf files
+    find:
+      paths: /tmp/cri-o/contrib/cni/
+      recurse: no
+      patterns: "*.conf"
+    register: cni_configs
+
+  - name: Copy CNI-configuration
+    copy:
+      remote_src: yes
+      src: "{{ item.path }}"
+      dest: /etc/cni/net.d/
+    with_items: "{{ cni_configs.files }}"
+
+  - name: Make CRI-O "first run" config
+    make:
+      chdir: /tmp/cri-o
+      target: install.config
+
+  - name: Basic registries config
+    copy:
+      dest: /etc/containers/registries.conf
+      content: |
+        [registries.search]
+        registries = ['registry.access.redhat.com', 'registry.fedoraproject.org', 'quay.io', 'docker.io']
+
+        [registries.insecure]
+        registries = []
+
+        [registries.block]
+        registries = []
+ 
+
+  - name: Use systemd cgroups
+    copy:
+      dest: /etc/crio/crio.conf.d/01-cgroup-manager.conf
+      content: |
+        [crio.runtime]
+        cgroup_manager = "systemd"
+
+  - name: Install systemd service
+    make:
+      chdir: /tmp/cri-o
+      target: install.systemd
+
+  - name: Enable and start CRI-O with stystemd
+    systemd:
+      daemon_reload: yes
+      state: started
+      enabled: yes
+      name: crio
+
+  - name: Install crictl
+    unarchive:
+      src: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ crictl_ver }}/crictl-{{ crictl_ver }}-linux-amd64.tar.gz"
+      dest: /usr/local/bin/
+      remote_src: yes
