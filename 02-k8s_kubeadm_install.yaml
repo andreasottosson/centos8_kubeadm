@@ -2,9 +2,9 @@
 - hosts: k8s-master1
   become: true
   remote_user: root
-  
+
   vars:
-    
+
   tasks:
   - name: Disable SWAP
     shell: |
@@ -15,7 +15,7 @@
       name: swap
       fstype: swap
       state: absent
- 
+
   - name: Set SELINUX to permissive (Deal with this later)
     shell: setenforce 0
 
@@ -31,7 +31,7 @@
       permanent: yes
       immediate: yes
       state: enabled
-  
+
   - name: firewalld port 2379-2380 (ETCD)
     firewalld:
       port: 2379-2380/tcp
@@ -65,7 +65,7 @@
       name: br_netfilter
       state: present
 
-  - name: 'Set sysctl #1'
+  - name: Set sysctl bridge.bridge-nf-call-ip6tables
     sysctl:
       name: net.bridge.bridge-nf-call-ip6tables
       value: '1'
@@ -73,7 +73,7 @@
       sysctl_set: yes
       reload: yes
 
-  - name: 'Set sysctl #2'
+  - name: Set sysctl bridge.bridge-nf-call-iptables
     sysctl:
       name: net.bridge.bridge-nf-call-iptables
       value: '1'

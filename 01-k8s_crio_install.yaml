@@ -1,11 +1,13 @@
 ---
-- hosts: k8s-master1 
+- hosts: k8s-master1
   become: true
   remote_user: root
-  
+
   vars:
+    crio_ver: master # release-1.18 not final, use master branch for now
     crictl_ver: v1.17.0
-    cni_plugins_ver: v0.8.1
+    cni_plugins_ver: v0.8.5
+    conmon_version: master # move to v2.0.14 ?
 
   tasks:
   - name: Install build deps
@@ -32,6 +34,7 @@
     git:
       repo: https://github.com/cri-o/cri-o.git
       dest: /tmp/cri-o
+      version: "{{ crio_ver }}"
 
   - name: Make CRIO-O
     make:
@@ -46,6 +49,7 @@
     git:
       repo: https://github.com/containers/conmon
       dest: /tmp/conmon
+      version: "{{ conmon_version }}"
 
   - name: Make conmon
     make:
@@ -103,7 +107,6 @@
 
         [registries.block]
         registries = []
- 
 
   - name: Use systemd cgroups
     copy:
@@ -124,7 +127,7 @@
       enabled: yes
       name: crio
 
-  - name: Install crictl
+  - name: Install cri-tools (crictl)
     unarchive:
       src: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ crictl_ver }}/crictl-{{ crictl_ver }}-linux-amd64.tar.gz"
       dest: /usr/local/bin/
