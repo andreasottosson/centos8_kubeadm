@@ -8,7 +8,7 @@ ONLY FOR DEV. PURPOSES
 - calico
 - selinux in enforcing mode
 
-### Preqeqs
+### Prereqs.
 - A CentOS machine/VM minimal install with SSH enabled
 - Ansible installed on your machine
 - Replace all references to 10.0.1.18 with your masters IP (doh)
