@@ -1,5 +1,5 @@
 ---
-- hosts: k8s-master1
+- hosts: master
   become: true
   remote_user: root
 
@@ -10,6 +10,19 @@
     conmon_version: master # move to v2.0.14 ?
 
   tasks:
+  - name: Enable EPEL repo
+    dnf:
+      name: epel-release
+      state: present
+
+  - name: Enable PowerTools repo
+    shell: dnf config-manager --set-enabled PowerTools
+
+  - name: Update all packages
+    dnf:
+      name: "*"
+      state: latest
+
   - name: Install build deps
     dnf:
       name:
@@ -70,11 +83,23 @@
     shell: |
       cd /tmp/cni-plugins && ./build_linux.sh
 
+  - name: Create CNI bin directory
+    file:
+      path: /opt/cni/bin/
+      state: directory
+      mode: '0755'
+
   - name: Copy CNI-plugins
     copy:
       remote_src: yes
       src: /tmp/cni-plugins/bin/
       dest: /opt/cni/bin/
+
+  - name: Create CNI conf directory
+    file:
+      path: /etc/cni/net.d/
+      state: directory
+      mode: '0755'
 
   - name: Find .conf files
     find:
